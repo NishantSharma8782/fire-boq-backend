@@ -1,0 +1,52 @@
+# =========================
+# Backend (Python)
+# =========================
+venv/
+__pycache__/
+__init__.py
+__pycache__/__init__.cpython-312.pyc
+.env.local
+.env
+uploads/
+*.log
+.env
+
+# Python cache
+*.pyc
+*.pyo
+*.pyd
+
+# =========================
+
+
+# =========================
+# OS Files
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# IDE
+# =========================
+.vscode/
+.idea/
+
+# =========================
+# Logs
+# =========================
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# =========================
+# Build Files
+# =========================
+dist/
+build/
+
+# =========================
+# Misc
+# =========================
+coverage/
+.cache/
