@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 from datetime import datetime
 from app.models.chat import ChatRequest, ChatResponse
 from app.db.database import get_collection
-from app.services import gemini_service
+from app.services import ai_service
 
 router = APIRouter(prefix="/chat", tags=["AI Assistant"])
 
@@ -20,7 +20,10 @@ async def chat(request: ChatRequest):
     analysis = await analyses_col.find_one({"project_id": request.project_id})
     boq = await boq_col.find_one({"project_id": request.project_id})
 
-    # Build context for Gemini
+    # Project's selected AI model
+    ai_model = project.get("ai_model", "gemini")
+
+    # Build context
     project_context = {
         "project": {
             "name": project.get("project_name"),
@@ -29,6 +32,7 @@ async def chat(request: ChatRequest):
             "building_type": project.get("building_type"),
             "hazard_category": project.get("hazard_category"),
             "location": project.get("location"),
+            "ai_model": ai_model,
         },
         "building_analysis": analysis.get("building_data") if analysis else None,
         "fire_recommendations": analysis.get("recommendations") if analysis else None,
@@ -40,10 +44,11 @@ async def chat(request: ChatRequest):
 
     history = [msg.dict() for msg in (request.history or [])]
 
-    reply = await gemini_service.chat_with_context(
+    reply = await ai_service.chat_with_context(
         message=request.message,
         project_context=project_context,
         history=history,
+        ai_model=ai_model,
     )
 
     return ChatResponse(

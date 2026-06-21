@@ -4,6 +4,9 @@ from functools import lru_cache
 
 class Settings(BaseSettings):
     gemini_api_key: str = ""
+    openai_api_key: str = ""
+    groq_api_key: str = ""
+    claude_api_key: str = ""
     mongodb_url: str = "mongodb://localhost:27017"
     db_name: str = "fire_boq_db"
     upload_dir: str = "./uploads"

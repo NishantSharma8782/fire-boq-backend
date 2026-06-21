@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any, Literal
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 
@@ -72,7 +72,7 @@ class AnalysisResponse(BaseModel):
     recommendations: FireRecommendations
     layout_data: LayoutData
     raw_analysis: Optional[str] = ""
-    data_source: Optional[Literal["ai", "manual"]] = "ai"
+    data_source: Optional[str] = "ai"
     created_at: datetime
 
 

@@ -18,6 +18,12 @@ class BOQSection(BaseModel):
     items: List[BOQItem]
 
 
+class BOQGenerateRequest(BaseModel):
+    standard: str = "NBC"             # "NBC" or "NFPA"
+    boq_type: str = "manual"          # "manual" or "ai"
+    ai_model: Optional[str] = None    # if None, uses the project's saved ai_model
+
+
 class BOQReport(BaseModel):
     id: str
     project_id: str
@@ -25,6 +31,9 @@ class BOQReport(BaseModel):
     total_items: int
     generated_at: datetime
     notes: Optional[str] = ""
+    standard: str = "NBC"
+    boq_type: str = "manual"
+    ai_model: str = ""
 
 
 class BOQGenerateResponse(BaseModel):

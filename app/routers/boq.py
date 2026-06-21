@@ -1,9 +1,10 @@
 from fastapi import APIRouter, HTTPException
 from bson import ObjectId
 from datetime import datetime
-from app.models.boq import BOQReport, BOQGenerateResponse
+from app.models.boq import BOQReport, BOQGenerateResponse, BOQGenerateRequest
 from app.db.database import get_collection
 from app.services.boq_engine import generate_boq
+from app.services.ai_boq_service import generate_ai_boq
 
 router = APIRouter(prefix="/boq", tags=["BOQ"])
 
@@ -15,8 +16,8 @@ def _serialize(doc: dict) -> dict:
 
 
 @router.post("/{project_id}/generate", response_model=BOQGenerateResponse)
-async def generate_project_boq(project_id: str):
-    """Generate BOQ from analysis results."""
+async def generate_project_boq(project_id: str, req: BOQGenerateRequest = BOQGenerateRequest()):
+    """Generate BOQ from analysis results. Supports NBC/NFPA standards and manual/AI BOQ types."""
     projects_col = get_collection("projects")
     analyses_col = get_collection("analyses")
     boq_col = get_collection("boq_reports")
@@ -35,13 +36,30 @@ async def generate_project_boq(project_id: str):
     building_data = analysis.get("building_data", {})
     recommendations = analysis.get("recommendations", {})
 
-    # Generate BOQ
-    boq_data = generate_boq(
-        project=project,
-        building_data=building_data,
-        recommendations=recommendations,
-        hazard_category=project.get("hazard_category", "light"),
-    )
+    standard = req.standard.upper() if req.standard else "NBC"
+    boq_type = req.boq_type.lower() if req.boq_type else "manual"
+    # Use project's ai_model as default — allow request to override
+    project_ai_model = project.get("ai_model", "gemini")
+    ai_model = req.ai_model.lower() if req.ai_model else project_ai_model
+
+
+    # Route to AI or manual engine
+    if boq_type == "ai":
+        boq_data = await generate_ai_boq(
+            building_data=building_data,
+            recommendations=recommendations,
+            project=project,
+            standard=standard,
+            ai_model=ai_model,
+        )
+    else:
+        boq_data = generate_boq(
+            project=project,
+            building_data=building_data,
+            recommendations=recommendations,
+            hazard_category=project.get("hazard_category", "light"),
+            standard=standard,
+        )
 
     now = datetime.utcnow()
     doc = {
@@ -63,7 +81,7 @@ async def generate_project_boq(project_id: str):
 
     return BOQGenerateResponse(
         success=True,
-        message="BOQ generated successfully",
+        message=f"BOQ generated successfully ({standard} standard, {boq_type} mode)",
         boq=_serialize(created),
     )
 

@@ -7,11 +7,12 @@ from app.models.analysis import (
     ManualBuildingInput,
 )
 from app.db.database import get_collection
-from app.services import gemini_service
+from app.services import ai_service
 from app.services.boq_engine import calculate_fire_recommendations
 from app.services.layout_engine import generate_layout
 
 router = APIRouter(prefix="/analysis", tags=["Analysis"])
+
 
 
 def _serialize(doc: dict) -> dict:
@@ -63,11 +64,8 @@ async def _save_analysis(
 @router.post("/{project_id}/analyze", response_model=AnalysisTriggerResponse)
 async def trigger_analysis(project_id: str):
     """
-    Trigger Gemini AI analysis for a project's drawings.
-
-    On AI failure the endpoint returns HTTP 200 with success=False and
-    requires_manual=True — the frontend must show the manual entry form.
-    It NEVER returns fake/default building data.
+    Trigger AI analysis for a project's drawings using the project's selected AI model.
+    On failure returns HTTP 200 with success=False — frontend shows manual entry.
     """
     projects_col = get_collection("projects")
     drawings_col = get_collection("drawings")
@@ -88,15 +86,17 @@ async def trigger_analysis(project_id: str):
 
     hazard_category = project.get("hazard_category", "light")
     building_type = project.get("building_type", "office")
+    ai_model = project.get("ai_model", "gemini")
 
-    # ── Run Gemini analysis ────────────────────────────────────────────────────
-    analysis_result = await gemini_service.analyze_drawing(
+    # ── Run AI analysis via unified service ────────────────────────────────────
+    analysis_result = await ai_service.analyze_drawing(
         file_path=drawing["file_path"],
         building_type=building_type,
         hazard_category=hazard_category,
+        ai_model=ai_model,
     )
 
-    # ── AI failed — return structured error, DO NOT use fake data ─────────────
+    # ── AI failed — return structured error ────────────────────────────────────
     if not analysis_result.get("success"):
         return AnalysisTriggerResponse(
             success=False,
@@ -111,15 +111,16 @@ async def trigger_analysis(project_id: str):
         project_id=project_id,
         building_data=analysis_result["building_data"],
         hazard_category=hazard_category,
-        data_source="ai",
+        data_source=f"ai_{ai_model}",
         raw_analysis=analysis_result.get("raw", ""),
     )
 
     return AnalysisTriggerResponse(
         success=True,
-        message="AI analysis completed successfully",
+        message=f"AI analysis completed successfully using {ai_model}",
         analysis=created,
     )
+
 
 
 @router.post("/{project_id}/manual", response_model=AnalysisTriggerResponse)
