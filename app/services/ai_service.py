@@ -73,27 +73,21 @@ def _load_image_b64(file_path: str) -> tuple[bytes, str]:
 
 # ── Drawing analysis prompt ────────────────────────────────────────────────────
 ANALYSIS_PROMPT = (
-    "Analyze this building floor plan. Building type: {building_type}, hazard: {hazard_category}.\n"
+    "You are a fire safety engineer analyzing a building floor plan image.\n"
+    "Building Type context: {building_type}, Hazard Category: {hazard_category}.\n\n"
+    "IMPORTANT RULES:\n"
+    "1. ONLY extract values you can actually SEE in the drawing. Do NOT guess or make up numbers.\n"
+    "2. If the image is blurry, incomplete, not a floor plan, or unreadable: set extraction_failed=true and explain in failure_reason.\n"
+    "3. For estimated_area: measure or estimate from visible rooms/spaces. Do NOT default to 500.\n"
+    "4. For floors: only count floors shown or labeled. Do NOT default to 3.\n\n"
     "Return ONLY valid JSON (no markdown, no extra text):\n"
-    '{{"building_type":"<detected type>","rooms":<int>,"estimated_area":<sqm float>,'
+    '{{"extraction_failed":false,"failure_reason":"",'
+    '"building_type":"<detected type>","rooms":<int>,'
+    '"estimated_area":<actual sqm float from drawing>,'
     '"floors":<int>,"corridors":<int>,"stairs":<int>,"entrances":<int>,"exits":<int>,'
-    '"open_areas":<int>,"ceiling_height":<meters float>,"description":"<brief>"}}\n'
-    "Use reasonable estimates. estimated_area in square meters."
-)
-
-# ── Groq text-based analysis prompt ───────────────────────────────────────────
-GROQ_ANALYSIS_PROMPT = (
-    "You are a fire safety engineer. A building floor plan has been uploaded but you cannot see it.\n"
-    "Based on these known project details:\n"
-    "  Building Type: {building_type}\n"
-    "  Hazard Category: {hazard_category}\n"
-    "Provide a reasonable estimate for a typical {building_type} building.\n"
-    "Return ONLY valid JSON (no markdown fences, no extra text):\n"
-    '{{"building_type":"{building_type}","rooms":20,"estimated_area":500.0,'
-    '"floors":3,"corridors":6,"stairs":2,"entrances":2,"exits":4,'
-    '"open_areas":2,"ceiling_height":3.0,"description":"Typical {building_type} building - manual review recommended"}}\n'
-    "Note: These are estimated values since image analysis is not available for Groq. "
-    "User should verify and adjust via manual entry."
+    '"open_areas":<int>,"ceiling_height":<meters float>,'
+    '"description":"<what you actually see in the drawing>"}}\n'
+    "If extraction_failed is true, all numeric fields must be 0."
 )
 
 
@@ -164,6 +158,14 @@ async def _openai_analyze(file_path: str, building_type: str, hazard_category: s
         data = _extract_json(raw)
         if not data:
             return {"success": False, "error_code": "EMPTY_RESPONSE", "error_message": "GPT-4o returned no structured data.", "building_data": None}
+        # Check if AI flagged extraction failure
+        if data.get("extraction_failed"):
+            return {
+                "success": False,
+                "error_code": "IMAGE_UNREADABLE",
+                "error_message": f"GPT-4o could not extract data from the drawing: {data.get('failure_reason', 'Image unclear or not a floor plan')}. Please upload a clearer drawing or use Manual Entry.",
+                "building_data": None,
+            }
         return {"success": True, "building_data": _sanitize(data, building_type), "raw": raw}
     except Exception as e:
         return {"success": False, "error_code": "UNKNOWN_ERROR", "error_message": f"OpenAI error: {str(e)[:200]}", "building_data": None}
@@ -199,50 +201,32 @@ async def _claude_analyze(file_path: str, building_type: str, hazard_category: s
         data = _extract_json(raw)
         if not data:
             return {"success": False, "error_code": "EMPTY_RESPONSE", "error_message": "Claude returned no structured data.", "building_data": None}
+        # Check if AI flagged extraction failure
+        if data.get("extraction_failed"):
+            return {
+                "success": False,
+                "error_code": "IMAGE_UNREADABLE",
+                "error_message": f"Claude could not extract data from the drawing: {data.get('failure_reason', 'Image unclear or not a floor plan')}. Please upload a clearer drawing or use Manual Entry.",
+                "building_data": None,
+            }
         return {"success": True, "building_data": _sanitize(data, building_type), "raw": raw}
     except Exception as e:
         return {"success": False, "error_code": "UNKNOWN_ERROR", "error_message": f"Claude error: {str(e)[:200]}", "building_data": None}
 
 
 async def _groq_analyze_text(building_type: str, hazard_category: str) -> dict:
-    """Groq has no vision — return estimated data with a warning."""
-    api_key = getattr(settings, "groq_api_key", "") or ""
-    if not api_key:
-        return {
-            "success": False,
-            "error_code": "API_KEY_INVALID",
-            "error_message": "GROQ_API_KEY not configured in backend/.env. Groq does not support image analysis — please use Gemini/Claude/OpenAI for drawing analysis, or enter measurements manually.",
-            "building_data": None,
-        }
-    try:
-        from groq import AsyncGroq
-        client = AsyncGroq(api_key=api_key)
-        prompt = GROQ_ANALYSIS_PROMPT.format(building_type=building_type, hazard_category=hazard_category)
-        response = await client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[
-                {"role": "system", "content": "You are a fire safety engineering assistant. Return only valid JSON."},
-                {"role": "user", "content": prompt},
-            ],
-            temperature=0.1,
-            max_tokens=400,
-        )
-        raw = response.choices[0].message.content or ""
-        data = _extract_json(raw)
-        if not data:
-            # Provide a safe default
-            data = {"building_type": building_type, "rooms": 20, "estimated_area": 500.0,
-                    "floors": 3, "corridors": 6, "stairs": 2, "entrances": 2, "exits": 4,
-                    "open_areas": 2, "ceiling_height": 3.0,
-                    "description": f"Groq estimated — image analysis unavailable. Please verify via manual entry."}
-        return {
-            "success": True,
-            "building_data": _sanitize(data, building_type),
-            "raw": raw,
-            "warning": "Groq does not support image analysis. Values are estimated — please review and edit via Manual Entry.",
-        }
-    except Exception as e:
-        return {"success": False, "error_code": "UNKNOWN_ERROR", "error_message": f"Groq error: {str(e)[:200]}", "building_data": None}
+    """Groq has NO vision capability — always return a clear error so user uses Manual Entry."""
+    return {
+        "success": False,
+        "error_code": "IMAGE_UNREADABLE",
+        "error_message": (
+            "Groq LLaMA-3.3 does not support image/drawing analysis — it is a text-only model.\n\n"
+            "To analyze your drawing, please:\n"
+            "• Switch to a vision-capable model (Gemini 2.0 Flash, GPT-4o, or Claude 3.5 Sonnet), OR\n"
+            "• Use ✏️ Manual Entry to input your building measurements directly."
+        ),
+        "building_data": None,
+    }
 
 
 def _sanitize(data: dict, building_type: str) -> dict:

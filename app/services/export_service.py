@@ -121,15 +121,16 @@ def generate_pdf(project: dict, building_data: dict, recommendations: dict, boq_
         "B": colors.HexColor("#2980B9"),
         "C": colors.HexColor("#27AE60"),
     }
+    section_light_colors = {
+        "A": colors.HexColor("#FADBD8"),
+        "B": colors.HexColor("#D6EAF8"),
+        "C": colors.HexColor("#D5F5E3"),
+    }
 
     for section in boq_sections:
         sec_id = section.get("section_id", "")
         sec_color = section_colors.get(sec_id, DARK_GRAY)
-        sec_light = colors.HexColor(
-            f"#{min(255, int(sec_color.hexval()[1:3], 16) + 40):02X}"
-            f"{min(255, int(sec_color.hexval()[3:5], 16) + 40):02X}"
-            f"{min(255, int(sec_color.hexval()[5:7], 16) + 40):02X}"
-        )
+
 
         # Section heading
         story.append(Paragraph(

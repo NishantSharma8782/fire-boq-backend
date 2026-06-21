@@ -253,14 +253,23 @@ async def analyze_drawing(file_path: str, building_type: str, hazard_category: s
     """
     client = _get_client()
 
-    # Compact prompt — minimum tokens while preserving accuracy
+    # Compact but strict prompt — prevents random guessing
     prompt = (
-        f"Analyze this building floor plan. Building type: {building_type}, hazard: {hazard_category}.\n"
+        f"You are a fire safety engineer analyzing a building floor plan image.\n"
+        f"Building Type: {building_type}, Hazard Category: {hazard_category}.\n\n"
+        "IMPORTANT RULES:\n"
+        "1. ONLY extract values you can actually SEE in the image. Do NOT guess.\n"
+        "2. If image is blurry, not a floor plan, or unreadable: set extraction_failed=true, explain in failure_reason.\n"
+        "3. estimated_area: measure/estimate from visible spaces. Do NOT default to 500.\n"
+        "4. floors: only count what is labeled/shown. Do NOT default to 3.\n\n"
         "Return ONLY valid JSON (no markdown, no extra text):\n"
-        '{"building_type":"<detected type>","rooms":<int>,"estimated_area":<sqm float>,'
+        '{"extraction_failed":false,"failure_reason":"",'
+        '"building_type":"<detected>","rooms":<int>,'
+        '"estimated_area":<actual sqm float>,'
         '"floors":<int>,"corridors":<int>,"stairs":<int>,"entrances":<int>,"exits":<int>,'
-        '"open_areas":<int>,"ceiling_height":<meters float>,"description":"<brief>"}\n'
-        "Use reasonable estimates. estimated_area in square meters."
+        '"open_areas":<int>,"ceiling_height":<meters float>,'
+        '"description":"<what you actually see>"}\n'
+        "If extraction_failed is true, set all numeric fields to 0."
     )
 
     try:
@@ -307,6 +316,19 @@ async def analyze_drawing(file_path: str, building_type: str, hazard_category: s
             "building_data": None,
         }
 
+    # Check if Gemini itself flagged that extraction failed
+    if data.get("extraction_failed"):
+        reason = data.get("failure_reason") or "Image unclear or not a recognizable floor plan."
+        return {
+            "success": False,
+            "error_code": ERROR_IMAGE_UNREADABLE,
+            "error_message": (
+                f"Gemini could not extract data from this drawing: {reason}\n\n"
+                "Please upload a clearer floor plan image, or use ✏️ Manual Entry to input your measurements directly."
+            ),
+            "building_data": None,
+        }
+
     # Validate and sanitise extracted values
     building_data = {
         "building_type": str(data.get("building_type", building_type))[:100],
@@ -336,6 +358,7 @@ async def analyze_drawing(file_path: str, building_type: str, hazard_category: s
         }
 
     return {"success": True, "building_data": building_data, "raw": raw_text}
+
 
 
 # ── Chat assistant ────────────────────────────────────────────────────────────
