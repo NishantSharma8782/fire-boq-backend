@@ -5,10 +5,14 @@ model selected for a project: Gemini, OpenAI, Groq, or Claude.
 Models supported:
   gemini  → Google Gemini 2.0 Flash (vision + text)
   openai  → OpenAI GPT-4o (vision + text)
-  groq    → Groq LLaMA-3.3 70B (text only — fast inference)
+  groq    → Groq LLaMA-3.3 70B (text only — Gemini handles image analysis)
   claude  → Anthropic Claude 3.5 Sonnet (vision + text)
 
-For drawing analysis, models without vision (groq) fall back to manual entry.
+IMPORTANT:
+  - Drawing/image analysis: Groq has NO vision, so Gemini is ALWAYS used for
+    image analysis regardless of the selected model. No error is raised.
+  - BOQ generation: Groq CAN generate text BOQs. If Groq fails, Gemini retries.
+  - Chat: Groq works fine for text chat.
 """
 import json
 import re
@@ -102,29 +106,32 @@ async def analyze_drawing(
     ai_model: str = "gemini",
 ) -> dict:
     """
-    Analyze a building drawing using the selected AI model.
+    Analyze a building drawing image using an AI vision model.
+
+    GROQ SPECIAL CASE: Groq LLaMA-3.3 has NO vision capability. When the project
+    uses Groq, we silently use Gemini for image analysis instead — no error is
+    shown to the user. The result is tagged with data_source='ai_gemini_vision'.
+
     Returns: {success, building_data, raw} or {success=False, error_code, error_message}
     """
     model = ai_model.lower()
 
-    if model == "gemini":
-        from app.services import gemini_service
-        return await gemini_service.analyze_drawing(file_path, building_type, hazard_category)
-
-    elif model == "openai":
+    if model == "openai":
         return await _openai_analyze(file_path, building_type, hazard_category)
 
     elif model == "claude":
         return await _claude_analyze(file_path, building_type, hazard_category)
 
-    elif model == "groq":
-        # Groq has no vision — return a structured fallback with a warning
-        return await _groq_analyze_text(building_type, hazard_category)
-
     else:
-        # Unknown model → fallback to Gemini
+        # gemini, groq (no vision → use gemini), or any unknown model
+        # Always use Gemini for image analysis — it's the most capable vision model
         from app.services import gemini_service
-        return await gemini_service.analyze_drawing(file_path, building_type, hazard_category)
+        result = await gemini_service.analyze_drawing(file_path, building_type, hazard_category)
+        if model == "groq" and result.get("success"):
+            # Tag that Gemini handled the vision part transparently
+            result["vision_model"] = "gemini"
+            result["raw"] = "[Image analyzed by Gemini 2.0 Flash — Groq is text-only] " + result.get("raw", "")
+        return result
 
 
 async def _openai_analyze(file_path: str, building_type: str, hazard_category: str) -> dict:
@@ -214,19 +221,8 @@ async def _claude_analyze(file_path: str, building_type: str, hazard_category: s
         return {"success": False, "error_code": "UNKNOWN_ERROR", "error_message": f"Claude error: {str(e)[:200]}", "building_data": None}
 
 
-async def _groq_analyze_text(building_type: str, hazard_category: str) -> dict:
-    """Groq has NO vision capability — always return a clear error so user uses Manual Entry."""
-    return {
-        "success": False,
-        "error_code": "IMAGE_UNREADABLE",
-        "error_message": (
-            "Groq LLaMA-3.3 does not support image/drawing analysis — it is a text-only model.\n\n"
-            "To analyze your drawing, please:\n"
-            "• Switch to a vision-capable model (Gemini 2.0 Flash, GPT-4o, or Claude 3.5 Sonnet), OR\n"
-            "• Use ✏️ Manual Entry to input your building measurements directly."
-        ),
-        "building_data": None,
-    }
+# NOTE: _groq_analyze_text() removed.
+# Groq image analysis now silently uses Gemini (see analyze_drawing above).
 
 
 def _sanitize(data: dict, building_type: str) -> dict:

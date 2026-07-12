@@ -263,22 +263,33 @@ async def generate_ai_boq(
         print(f"[AI_BOQ] {display_name} failed: {e}")
 
     if not ai_data or not ai_data.get("sections"):
-        print(f"[AI_BOQ] Falling back to manual engine. Reason: {error_msg or 'empty response'}")
-        fallback = generate_boq(
-            project=project,
-            building_data=building_data,
-            recommendations=recommendations,
-            hazard_category=project.get("hazard_category", "light"),
-            standard=standard,
-        )
-        fallback["boq_type"] = "ai_fallback"
-        fallback["ai_model"] = model
-        err_short = error_msg[:120] if error_msg else "AI returned empty response"
-        fallback["notes"] = (
-            f"[Note: {display_name} BOQ generation failed — {err_short}. "
-            f"Showing manual calculation instead.] " + fallback.get("notes", "")
-        )
-        return fallback
+        # If primary model failed and it's not Gemini, retry with Gemini first
+        if model != "gemini":
+            print(f"[AI_BOQ] {display_name} failed or empty. Retrying with Gemini...")
+            try:
+                ai_data = await _call_gemini(prompt)
+            except Exception as eg:
+                print(f"[AI_BOQ] Gemini retry also failed: {eg}")
+                ai_data = None
+
+        # Still nothing? Only then fall back to manual engine
+        if not ai_data or not ai_data.get("sections"):
+            print(f"[AI_BOQ] Both {display_name} and Gemini failed. Using manual engine as last resort.")
+            fallback = generate_boq(
+                project=project,
+                building_data=building_data,
+                recommendations=recommendations,
+                hazard_category=project.get("hazard_category", "light"),
+                standard=standard,
+            )
+            fallback["boq_type"] = "ai_fallback"
+            fallback["ai_model"] = model
+            err_short = error_msg[:120] if error_msg else "AI returned empty response"
+            fallback["notes"] = (
+                f"[Note: {display_name} and Gemini both failed — {err_short}. "
+                f"Showing manual calculation as last resort.] " + fallback.get("notes", "")
+            )
+            return fallback
 
     sections = _validate_and_build_sections(ai_data)
     total_items = sum(len(s["items"]) for s in sections)

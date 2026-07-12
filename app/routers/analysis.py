@@ -107,17 +107,30 @@ async def trigger_analysis(project_id: str):
         )
 
     # ── AI succeeded — persist and return ─────────────────────────────────────
+    # Determine which model actually did the vision analysis
+    # (Groq has no vision, so Gemini was used transparently)
+    vision_model = analysis_result.get("vision_model", ai_model)
+    if ai_model == "groq" and vision_model == "gemini":
+        data_source = "ai_gemini_vision"   # Gemini handled image, Groq for everything else
+        analysis_note = f"Image analyzed by Gemini 2.0 Flash (Groq is text-only)"
+    else:
+        data_source = f"ai_{ai_model}"
+        analysis_note = ""
+
     created = await _save_analysis(
         project_id=project_id,
         building_data=analysis_result["building_data"],
         hazard_category=hazard_category,
-        data_source=f"ai_{ai_model}",
+        data_source=data_source,
         raw_analysis=analysis_result.get("raw", ""),
     )
 
+    msg = f"AI analysis completed successfully using {ai_model}"
+    if analysis_note:
+        msg += f" ({analysis_note})"
     return AnalysisTriggerResponse(
         success=True,
-        message=f"AI analysis completed successfully using {ai_model}",
+        message=msg,
         analysis=created,
     )
 

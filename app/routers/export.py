@@ -36,12 +36,14 @@ async def _get_export_data(project_id: str):
 @router.get("/{project_id}/pdf")
 async def export_pdf(project_id: str):
     project, analysis, boq = await _get_export_data(project_id)
+    standard = boq.get("standard") or project.get("fire_standard") or "NBC"
 
     pdf_bytes = generate_pdf(
         project=project,
         building_data=analysis.get("building_data", {}),
         recommendations=analysis.get("recommendations", {}),
         boq_sections=boq.get("sections", []),
+        standard=standard,
     )
 
     filename = f"FireBOQ_{project.get('project_id', project_id)}.pdf"
@@ -55,12 +57,14 @@ async def export_pdf(project_id: str):
 @router.get("/{project_id}/excel")
 async def export_excel(project_id: str):
     project, analysis, boq = await _get_export_data(project_id)
+    standard = boq.get("standard") or project.get("fire_standard") or "NBC"
 
     excel_bytes = generate_excel(
         project=project,
         building_data=analysis.get("building_data", {}),
         recommendations=analysis.get("recommendations", {}),
         boq_sections=boq.get("sections", []),
+        standard=standard,
     )
 
     filename = f"FireBOQ_{project.get('project_id', project_id)}.xlsx"
