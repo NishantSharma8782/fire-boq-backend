@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.db.database import connect_db, close_db
-from app.routers import projects, drawings, analysis, boq, chat, export
+from app.routers import projects, drawings, analysis, boq, chat, export, agent
 from app.config import get_settings
 
 settings = get_settings()
@@ -46,6 +46,7 @@ app.include_router(analysis.router, prefix="/api/v1")
 app.include_router(boq.router, prefix="/api/v1")
 app.include_router(chat.router, prefix="/api/v1")
 app.include_router(export.router, prefix="/api/v1")
+app.include_router(agent.router, prefix="/api/v1")
 
 # Serve uploaded files
 upload_path = Path(settings.upload_dir)

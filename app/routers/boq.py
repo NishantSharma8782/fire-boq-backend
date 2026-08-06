@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from bson import ObjectId
 from datetime import datetime
-from app.models.boq import BOQReport, BOQGenerateResponse, BOQGenerateRequest
+from app.models.boq import BOQReport, BOQGenerateResponse, BOQGenerateRequest, BOQUpdateRequest
 from app.db.database import get_collection
 from app.services.boq_engine import generate_boq
 from app.services.ai_boq_service import generate_ai_boq
@@ -96,3 +96,39 @@ async def get_boq(project_id: str):
             detail="No BOQ found. Please generate BOQ first."
         )
     return _serialize(doc)
+
+
+@router.put("/{project_id}", response_model=BOQGenerateResponse)
+async def update_boq(project_id: str, req: BOQUpdateRequest):
+    """Update sections and items of an existing BOQ report."""
+    boq_col = get_collection("boq_reports")
+    doc = await boq_col.find_one({"project_id": project_id})
+    if not doc:
+        raise HTTPException(
+            status_code=404,
+            detail="No BOQ found to update. Please generate BOQ first."
+        )
+
+    sections_dict = [sec.dict() for sec in req.sections]
+    total_items = sum(len(sec["items"]) for sec in sections_dict)
+
+    update_fields = {
+        "sections": sections_dict,
+        "total_items": total_items,
+        "updated_at": datetime.utcnow(),
+    }
+    if req.notes is not None:
+        update_fields["notes"] = req.notes
+
+    await boq_col.update_one(
+        {"project_id": project_id},
+        {"$set": update_fields}
+    )
+
+    updated_doc = await boq_col.find_one({"project_id": project_id})
+    return BOQGenerateResponse(
+        success=True,
+        message="BOQ updated successfully",
+        boq=_serialize(updated_doc),
+    )
+

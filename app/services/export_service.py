@@ -1,7 +1,9 @@
 """
 Export Service - Generates PDF and Excel reports from project BOQ data.
+Architectural Obsidian & Flame Edition - High-Impact PDF Report.
 """
 import io
+import csv
 from datetime import datetime
 from typing import List
 import openpyxl
@@ -21,7 +23,7 @@ from reportlab.pdfgen import canvas
 
 
 class NumberedCanvas(canvas.Canvas):
-    """Two-pass canvas to dynamically compute total pages and draw headers/footers."""
+    """Two-pass canvas to dynamically compute total pages and draw running headers/footers."""
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._saved_page_states = []
@@ -41,36 +43,43 @@ class NumberedCanvas(canvas.Canvas):
     def draw_page_decorations(self, page_count):
         self.saveState()
         
-        # Running Top Header (Pages 2+)
+        # ── Running Top Header (Pages 2+) ──
         if self._pageNumber > 1:
             self.setFont("Helvetica-Bold", 8)
             self.setFillColor(colors.HexColor("#0F172A"))
-            self.drawString(1.2 * cm, 28.5 * cm, "FIRE PROTECTION SYSTEM — BILL OF QUANTITIES (BOQ)")
+            self.drawString(1.2 * cm, 28.5 * cm, "FIRE ENGINEERING TAKEOFF — BILL OF QUANTITIES (BOQ)")
             self.setFont("Helvetica", 7.5)
             self.setFillColor(colors.HexColor("#64748B"))
-            self.drawRightString(19.8 * cm, 28.5 * cm, "ENGINEERING ESTIMATION REPORT")
-            self.setStrokeColor(colors.HexColor("#CBD5E1"))
-            self.setLineWidth(0.5)
+            self.drawRightString(19.8 * cm, 28.5 * cm, "OFFICIAL ENGINEERING REPORT")
+            self.setStrokeColor(colors.HexColor("#EA580C"))
+            self.setLineWidth(1.8)
             self.line(1.2 * cm, 28.3 * cm, 19.8 * cm, 28.3 * cm)
 
-        # Running Footer (All Pages)
+        # ── Running Footer (All Pages) ──
+        self.setFont("Helvetica-Bold", 7.5)
+        self.setFillColor(colors.HexColor("#0F172A"))
+        self.drawString(1.2 * cm, 0.8 * cm, "STRICTLY CONFIDENTIAL")
         self.setFont("Helvetica", 7.5)
         self.setFillColor(colors.HexColor("#64748B"))
-        self.drawString(1.2 * cm, 0.8 * cm, "Confidential • AI Fire BOQ Platform • Subject to Engineering Verification")
+        self.drawString(4.5 * cm, 0.8 * cm, "• AI Fire Safety BOQ Engine • Subject to Final PE Verification")
         page_str = f"Page {self._pageNumber} of {page_count}"
         self.drawRightString(19.8 * cm, 0.8 * cm, page_str)
         self.setStrokeColor(colors.HexColor("#CBD5E1"))
-        self.setLineWidth(0.5)
+        self.setLineWidth(0.6)
         self.line(1.2 * cm, 1.1 * cm, 19.8 * cm, 1.1 * cm)
         
         self.restoreState()
 
 
 def generate_pdf(project: dict, building_data: dict, recommendations: dict, boq_sections: list, standard: str = "NBC") -> bytes:
-    """Generate a top-tier, ultra-professional PDF BOQ report with zero text overflows."""
+    """Generate an Executive Classic Architectural & Engineering PDF BOQ Report."""
     is_nfpa = standard.upper() == "NFPA"
-    std_display = "NFPA 72 / 13 / 14 / 10" if is_nfpa else "NBC 2016 / IS 2189"
-    std_notes = "NFPA 72 (Alarm), NFPA 13 (Sprinklers), NFPA 14 (Standpipes), NFPA 10 (Extinguishers)" if is_nfpa else "NBC 2016 Part 4, IS 2189:2008, IS 15105:2002, IS 3844:1989, IS 2190:2010"
+    std_display = "NFPA 72 / 13 / 14 / 10 COMPLIANT" if is_nfpa else "NBC 2016 / IS 2189 COMPLIANT"
+    std_notes = (
+        "NFPA 72 (Fire Alarm), NFPA 13 (Sprinklers), NFPA 14 (Standpipes), NFPA 10 (Extinguishers)"
+        if is_nfpa
+        else "NBC 2016 Part 4, IS 2189:2008, IS 15105:2002, IS 3844:1989, IS 2190:2010"
+    )
     
     buffer = io.BytesIO()
     
@@ -81,311 +90,306 @@ def generate_pdf(project: dict, building_data: dict, recommendations: dict, boq_
         pagesize=A4,
         rightMargin=1.2 * cm,
         leftMargin=1.2 * cm,
-        topMargin=1.5 * cm,
-        bottomMargin=1.5 * cm,
+        topMargin=1.4 * cm,
+        bottomMargin=1.4 * cm,
         title=f"Fire BOQ - {project.get('project_name', 'Report')}",
     )
 
     styles = getSampleStyleSheet()
     story = []
 
-    # ── COLOR PALETTE ────────────────────────────────────────────────────────────
-    PRIMARY_RED = colors.HexColor("#B91C1C")     # Deep Fire Red
-    SECONDARY_NAVY = colors.HexColor("#0F172A")  # Dark Slate Navy
-    TEXT_DARK = colors.HexColor("#1E293B")       # Dark Slate Body
-    TEXT_MUTED = colors.HexColor("#475569")      # Muted Subtext
-    BG_CARD = colors.HexColor("#F8FAFC")         # Soft Slate Tint
-    BG_HEADER = colors.HexColor("#FEF2F2")       # Soft Red Tint
-    BORDER_COLOR = colors.HexColor("#CBD5E1")    # Crisp Border Gray
-    WHITE = colors.white
+    # ── CLASSIC EXECUTIVE PALETTE ────────────────────────────────────────────────
+    COLOR_NAVY_MAIN   = colors.HexColor("#0B132A")  # Deep Executive Navy
+    COLOR_NAVY_HEADER = colors.HexColor("#1C2541")  # Slate Navy Header
+    COLOR_GOLD_ACCENT = colors.HexColor("#D4AF37")  # Classic Gold
+    COLOR_AMBER_TEXT  = colors.HexColor("#D97706")  # Rich Amber Text
+    COLOR_FLAME_RED   = colors.HexColor("#DC2626")  # Fire Red Accent
+    COLOR_TEXT_DARK   = colors.HexColor("#0F172A")  # Deep Charcoal Main Body
+    COLOR_TEXT_MUTED  = colors.HexColor("#475569")  # Slate Muted Subtext
+    COLOR_BG_LIGHT    = colors.HexColor("#F8FAFC")  # Off-white Card Tint
+    COLOR_BG_GOLD     = colors.HexColor("#FEFCE8")  # Warm Gold Tint
+    COLOR_BG_RED      = colors.HexColor("#FEF2F2")  # Soft Flame Tint
+    COLOR_BORDER      = colors.HexColor("#CBD5E1")  # Classic Border Gray
+    COLOR_BORDER_GOLD = colors.HexColor("#EAB308")  # Gold Border Accent
+    WHITE             = colors.white
 
-    # ── PARAGRAPH STYLES ─────────────────────────────────────────────────────────
-    banner_title_style = ParagraphStyle(
-        "BannerTitle", parent=styles["Title"],
+    # ── TYPOGRAPHY & PARAGRAPH STYLES ────────────────────────────────────────────
+    title_style = ParagraphStyle(
+        "DocTitle", parent=styles["Title"],
         fontName="Helvetica-Bold", fontSize=15, textColor=WHITE,
-        alignment=TA_LEFT, spaceAfter=2, leading=17
+        alignment=TA_LEFT, leading=18
     )
-    banner_sub_style = ParagraphStyle(
-        "BannerSub", parent=styles["Normal"],
-        fontName="Helvetica", fontSize=8.5, textColor=colors.HexColor("#FECACA"),
+    subtitle_style = ParagraphStyle(
+        "DocSubTitle", parent=styles["Normal"],
+        fontName="Helvetica-Bold", fontSize=8.5, textColor=COLOR_GOLD_ACCENT,
         alignment=TA_LEFT, leading=11
     )
-    banner_badge_title = ParagraphStyle(
-        "BannerBadgeTitle", parent=styles["Normal"],
+    header_proj_name = ParagraphStyle(
+        "HProjName", parent=styles["Normal"],
+        fontName="Helvetica", fontSize=9.5, textColor=colors.HexColor("#E2E8F0"),
+        alignment=TA_LEFT, leading=12
+    )
+    header_badge_style = ParagraphStyle(
+        "HBadge", parent=styles["Normal"],
         fontName="Helvetica-Bold", fontSize=8.5, textColor=WHITE,
         alignment=TA_RIGHT, leading=11
     )
-    banner_badge_sub = ParagraphStyle(
-        "BannerBadgeSub", parent=styles["Normal"],
-        fontName="Helvetica", fontSize=7.5, textColor=colors.HexColor("#E2E8F0"),
+    header_badge_sub = ParagraphStyle(
+        "HBadgeSub", parent=styles["Normal"],
+        fontName="Helvetica", fontSize=7.5, textColor=colors.HexColor("#94A3B8"),
         alignment=TA_RIGHT, leading=9.5
     )
 
-    sec_head_style = ParagraphStyle(
-        "SecHead", parent=styles["Heading2"],
-        fontName="Helvetica-Bold", fontSize=10, textColor=PRIMARY_RED,
-        spaceBefore=8, spaceAfter=4, leading=12
+    section_heading = ParagraphStyle(
+        "SecHeading", parent=styles["Heading2"],
+        fontName="Helvetica-Bold", fontSize=9.5, textColor=WHITE,
+        spaceBefore=0, spaceAfter=0, leading=12
     )
 
-    tbl_head_style = ParagraphStyle(
-        "TblHead", parent=styles["Normal"],
-        fontName="Helvetica-Bold", fontSize=7.5, textColor=WHITE,
-        alignment=TA_LEFT, leading=9
+    tbl_head_left = ParagraphStyle(
+        "TblHeadL", parent=styles["Normal"],
+        fontName="Helvetica-Bold", fontSize=8, textColor=WHITE,
+        alignment=TA_LEFT, leading=10
     )
-    tbl_head_center = ParagraphStyle("TblHeadCenter", parent=tbl_head_style, alignment=TA_CENTER)
-    tbl_head_right = ParagraphStyle("TblHeadRight", parent=tbl_head_style, alignment=TA_RIGHT)
+    tbl_head_center = ParagraphStyle("TblHeadC", parent=tbl_head_left, alignment=TA_CENTER)
+    tbl_head_right  = ParagraphStyle("TblHeadR", parent=tbl_head_left, alignment=TA_RIGHT)
 
     tbl_sno_style = ParagraphStyle(
         "TblSno", parent=styles["Normal"],
-        fontName="Helvetica-Bold", fontSize=7.5, textColor=PRIMARY_RED,
-        alignment=TA_CENTER, leading=9
+        fontName="Helvetica-Bold", fontSize=8, textColor=COLOR_FLAME_RED,
+        alignment=TA_CENTER, leading=10
     )
     tbl_item_style = ParagraphStyle(
         "TblItem", parent=styles["Normal"],
-        fontName="Helvetica-Bold", fontSize=8, textColor=SECONDARY_NAVY,
-        leading=10
+        fontName="Helvetica-Bold", fontSize=8.5, textColor=COLOR_TEXT_DARK,
+        leading=11
     )
     tbl_desc_style = ParagraphStyle(
         "TblDesc", parent=styles["Normal"],
-        fontName="Helvetica", fontSize=7.5, textColor=TEXT_DARK,
-        leading=9.5
+        fontName="Helvetica", fontSize=7.8, textColor=COLOR_TEXT_DARK,
+        leading=10
     )
     tbl_unit_style = ParagraphStyle(
         "TblUnit", parent=styles["Normal"],
-        fontName="Helvetica", fontSize=7.5, textColor=TEXT_MUTED,
-        alignment=TA_CENTER, leading=9.5
+        fontName="Helvetica", fontSize=7.8, textColor=COLOR_TEXT_MUTED,
+        alignment=TA_CENTER, leading=10
     )
     tbl_qty_style = ParagraphStyle(
         "TblQty", parent=styles["Normal"],
-        fontName="Helvetica-Bold", fontSize=8.5, textColor=PRIMARY_RED,
-        alignment=TA_RIGHT, leading=10.5
+        fontName="Helvetica-Bold", fontSize=9, textColor=COLOR_AMBER_TEXT,
+        alignment=TA_RIGHT, leading=11
     )
     tbl_basis_style = ParagraphStyle(
         "TblBasis", parent=styles["Normal"],
-        fontName="Helvetica-Oblique", fontSize=7.2, textColor=TEXT_MUTED,
-        leading=9
+        fontName="Helvetica-Oblique", fontSize=7.2, textColor=COLOR_TEXT_MUTED,
+        leading=9.5
     )
 
-    card_label = ParagraphStyle(
-        "CardLabel", parent=styles["Normal"],
-        fontName="Helvetica-Bold", fontSize=7.2, textColor=PRIMARY_RED,
-        leading=9
+    meta_label = ParagraphStyle(
+        "MetaLabel", parent=styles["Normal"],
+        fontName="Helvetica-Bold", fontSize=7.2, textColor=COLOR_AMBER_TEXT,
+        leading=9.5
     )
-    card_val = ParagraphStyle(
-        "CardVal", parent=styles["Normal"],
-        fontName="Helvetica", fontSize=8, textColor=TEXT_DARK,
-        leading=10
+    meta_val = ParagraphStyle(
+        "MetaVal", parent=styles["Normal"],
+        fontName="Helvetica", fontSize=8, textColor=COLOR_TEXT_DARK,
+        leading=10.5
     )
-    card_val_bold = ParagraphStyle(
-        "CardValBold", parent=styles["Normal"],
-        fontName="Helvetica-Bold", fontSize=8, textColor=SECONDARY_NAVY,
-        leading=10
+    meta_val_bold = ParagraphStyle(
+        "MetaValBold", parent=styles["Normal"],
+        fontName="Helvetica-Bold", fontSize=8.2, textColor=COLOR_NAVY_MAIN,
+        leading=10.5
     )
 
-    # ── 1. EXECUTIVE BANNER HEADER ──────────────────────────────────────────────
-    banner_left = [
-        Paragraph("FIRE PROTECTION SYSTEM BOQ", banner_title_style),
-        Paragraph(f"Official Engineering Estimation & Quantity Takeoff Report • {std_display}", banner_sub_style)
+    # Metrics sum
+    total_items_count = 0
+    total_qty_sum = 0
+    for sec in boq_sections:
+        for it in sec.get("items", []):
+            total_items_count += 1
+            try:
+                total_qty_sum += float(it.get("quantity", 0))
+            except (ValueError, TypeError):
+                pass
+
+    # ── 1. EXECUTIVE COVER HEADER BANNER ─────────────────────────────────────────
+    header_left = [
+        Paragraph("OFFICIAL FIRE ENGINEERING TAKEOFF REPORT", title_style),
+        Paragraph(f"BILL OF QUANTITIES (BOQ) • {std_display}", subtitle_style),
+        Spacer(1, 2),
+        Paragraph(f"<b>Project:</b> {project.get('project_name', 'N/A')}", header_proj_name)
     ]
-    banner_right = [
-        Paragraph(f"PROJECT ID: {project.get('project_id', 'N/A')}", banner_badge_title),
-        Paragraph(f"DATE: {datetime.now().strftime('%d %b %Y %H:%M')}", banner_badge_sub),
-        Paragraph(f"STANDARD: {std_display}", banner_badge_sub)
+    header_right = [
+        Paragraph(f"PROJECT ID: {project.get('project_id', 'N/A')}", header_badge_style),
+        Paragraph(f"DATE: {datetime.now().strftime('%d %b %Y, %H:%M')}", header_badge_sub),
+        Paragraph(f"STATUS: AUDITED ENGINEERING BOQ", header_badge_sub),
+        Paragraph(f"STANDARD: {standard.upper()}", header_badge_sub),
     ]
-    
-    banner_table = Table(
-        [[banner_left, banner_right]],
-        colWidths=[12.4 * cm, 6.2 * cm]
-    )
+
+    banner_table = Table([[header_left, header_right]], colWidths=[12.6 * cm, 6.0 * cm])
     banner_table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), SECONDARY_NAVY),
-        ("PADDING", (0, 0), (-1, -1), 10),
+        ("BACKGROUND", (0, 0), (-1, -1), COLOR_NAVY_MAIN),
+        ("PADDING", (0, 0), (-1, -1), 12),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("LINEBELOW", (0, 0), (-1, -1), 3.5, PRIMARY_RED),
+        ("LINEBELOW", (0, 0), (-1, -1), 3.5, COLOR_GOLD_ACCENT),
     ]))
     story.append(banner_table)
     story.append(Spacer(1, 8))
 
-    # ── 2. PROJECT METADATA CARD (2 SIDE-BY-SIDE CARDS) ──────────────────────────
-    proj_card = [
-        [Paragraph("Project Name", card_label), Paragraph(project.get("project_name", "N/A"), card_val_bold)],
-        [Paragraph("Client Name", card_label), Paragraph(project.get("client_name", "N/A"), card_val)],
-        [Paragraph("Site Location", card_label), Paragraph(project.get("location", "N/A"), card_val)],
-        [Paragraph("Prepared By", card_label), Paragraph("AI Fire Safety Engineering Platform", card_val)],
+    # ── 2. EXECUTIVE METRICS DASHBOARD (3 TILES ROW) ──────────────────────────
+    m1_content = [
+        Paragraph("PROJECT SPECIFICATION", meta_label),
+        Paragraph(f"<b>{project.get('project_name', 'N/A')}</b>", meta_val_bold),
+        Paragraph(f"Client: {project.get('client_name', 'N/A')}", meta_val),
+        Paragraph(f"Location: {project.get('location', 'N/A')}", meta_val),
+        Paragraph(f"Hazard Category: <b>{project.get('hazard_category', 'light').title()}</b>", meta_val),
     ]
-    t_proj = Table(proj_card, colWidths=[2.8 * cm, 6.2 * cm])
-    t_proj.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (0, -1), BG_HEADER),
-        ("BACKGROUND", (1, 0), (1, -1), WHITE),
-        ("GRID", (0, 0), (-1, -1), 0.5, BORDER_COLOR),
-        ("PADDING", (0, 0), (-1, -1), 4.5),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+    t_m1 = Table([[m1_content]], colWidths=[6.0 * cm])
+    t_m1.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), COLOR_BG_GOLD),
+        ("BOX", (0, 0), (-1, -1), 0.8, COLOR_BORDER_GOLD),
+        ("PADDING", (0, 0), (-1, -1), 7),
     ]))
 
-    spec_card = [
-        [Paragraph("Building Type", card_label), Paragraph(project.get("building_type", "N/A").title(), card_val_bold)],
-        [Paragraph("Hazard Class", card_label), Paragraph(project.get("hazard_category", "N/A").title(), card_val_bold)],
-        [Paragraph("Compliance Code", card_label), Paragraph(std_display, card_val_bold)],
-        [Paragraph("Report Status", card_label), Paragraph("Verified AI Estimate", card_val)],
+    m2_content = [
+        Paragraph("SPATIAL & BUILDING DATA", ParagraphStyle("M2L", parent=meta_label, textColor=colors.HexColor("#2563EB"))),
+        Paragraph(f"<b>{building_data.get('estimated_area', 0):,.0f} m² Total Floor Area</b>", meta_val_bold),
+        Paragraph(f"Floors: {building_data.get('floors', 1)} | Rooms: {building_data.get('rooms', 0)}", meta_val),
+        Paragraph(f"Corridors: {building_data.get('corridors', 0)} | Exits: {building_data.get('exits', 0)}", meta_val),
+        Paragraph(f"Staircases: {building_data.get('stairs', 0)} | Height: {building_data.get('ceiling_height', 3)}m", meta_val),
     ]
-    t_spec = Table(spec_card, colWidths=[2.8 * cm, 6.2 * cm])
-    t_spec.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (0, -1), BG_HEADER),
-        ("BACKGROUND", (1, 0), (1, -1), WHITE),
-        ("GRID", (0, 0), (-1, -1), 0.5, BORDER_COLOR),
-        ("PADDING", (0, 0), (-1, -1), 4.5),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+    t_m2 = Table([[m2_content]], colWidths=[6.0 * cm])
+    t_m2.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), COLOR_BG_LIGHT),
+        ("BOX", (0, 0), (-1, -1), 0.8, COLOR_BORDER),
+        ("PADDING", (0, 0), (-1, -1), 7),
     ]))
 
-    dash_table = Table([[t_proj, t_spec]], colWidths=[9.1 * cm, 9.1 * cm])
-    dash_table.setStyle(TableStyle([
+    m3_content = [
+        Paragraph("FIRE TAKEOFF SUMMARY", ParagraphStyle("M3L", parent=meta_label, textColor=COLOR_FLAME_RED)),
+        Paragraph(f"<b>{int(total_qty_sum):,} Total Devices & Units</b>", meta_val_bold),
+        Paragraph(f"Line Items: {total_items_count} across {len(boq_sections)} Sections", meta_val),
+        Paragraph(f"Building Type: {project.get('building_type', 'N/A').title()}", meta_val),
+        Paragraph(f"Fire Code: {standard.upper()} ({std_display.split(' ')[0]})", meta_val),
+    ]
+    t_m3 = Table([[m3_content]], colWidths=[6.0 * cm])
+    t_m3.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), COLOR_BG_RED),
+        ("BOX", (0, 0), (-1, -1), 0.8, colors.HexColor("#FCA5A5")),
+        ("PADDING", (0, 0), (-1, -1), 7),
+    ]))
+
+    dash_row = Table([[t_m1, t_m2, t_m3]], colWidths=[6.2 * cm, 6.2 * cm, 6.2 * cm])
+    dash_row.setStyle(TableStyle([
         ("PADDING", (0, 0), (-1, -1), 0),
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
     ]))
-    story.append(dash_table)
-    story.append(Spacer(1, 8))
-
-    # ── 3. BUILDING SPECIFICATIONS SUMMARY ──────────────────────────────────────
-    story.append(Paragraph("SPATIAL & BUILDING ANALYTICS SUMMARY", sec_head_style))
-    
-    summary_card = [
-        [
-            Paragraph("Total Floor Area", card_label),
-            Paragraph(f"<b>{building_data.get('estimated_area', 0):.0f} sqm</b>", card_val_bold),
-            Paragraph("Total Floors", card_label),
-            Paragraph(f"<b>{building_data.get('floors', 1)} Floors</b>", card_val_bold),
-        ],
-        [
-            Paragraph("Total Rooms", card_label),
-            Paragraph(str(building_data.get("rooms", 0)), card_val),
-            Paragraph("Corridors Count", card_label),
-            Paragraph(str(building_data.get("corridors", 0)), card_val),
-        ],
-        [
-            Paragraph("Staircases", card_label),
-            Paragraph(str(building_data.get("stairs", 0)), card_val),
-            Paragraph("Emergency Exits", card_label),
-            Paragraph(str(building_data.get("exits", 0)), card_val),
-        ],
-    ]
-    summary_table = Table(summary_card, colWidths=[3.0 * cm, 6.1 * cm, 3.0 * cm, 6.1 * cm])
-    summary_table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (0, -1), BG_HEADER),
-        ("BACKGROUND", (2, 0), (2, -1), BG_HEADER),
-        ("GRID", (0, 0), (-1, -1), 0.5, BORDER_COLOR),
-        ("ROWBACKGROUNDS", (1, 0), (1, -1), [WHITE, BG_CARD]),
-        ("ROWBACKGROUNDS", (3, 0), (3, -1), [WHITE, BG_CARD]),
-        ("PADDING", (0, 0), (-1, -1), 4.5),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-    ]))
-    story.append(summary_table)
+    story.append(dash_row)
     story.append(Spacer(1, 10))
 
-    # ── 4. BOQ SECTIONS (TABLES WITH ZERO OVERFLOW) ────────────────────────────
-    # Printable width: 18.6 cm
-    col_widths = [1.0 * cm, 3.6 * cm, 6.4 * cm, 1.4 * cm, 1.8 * cm, 4.4 * cm]
+    # ── 3. BOQ SECTIONS & TABLES ──────────────────────────────────────────────
+    col_widths = [1.1 * cm, 3.7 * cm, 6.3 * cm, 1.3 * cm, 1.8 * cm, 4.4 * cm]
 
-    boq_header_row = [
+    table_header_row = [
         Paragraph("S.No", tbl_head_center),
-        Paragraph("Item Name", tbl_head_style),
-        Paragraph("Technical Description & Specification", tbl_head_style),
+        Paragraph("Item Specification", tbl_head_left),
+        Paragraph("Technical Description", tbl_head_left),
         Paragraph("Unit", tbl_head_center),
         Paragraph("Qty", tbl_head_right),
-        Paragraph("Calculation & Standard Basis", tbl_head_style),
+        Paragraph("Calculation Basis & Code Standard", tbl_head_left),
     ]
 
-    section_badge_colors = {
-        "A": colors.HexColor("#B91C1C"), # Deep Red
-        "B": colors.HexColor("#1E40AF"), # Deep Blue
-        "C": colors.HexColor("#047857"), # Deep Emerald
+    section_accent_colors = {
+        "A": colors.HexColor("#DC2626"),  # Flame Red
+        "B": colors.HexColor("#2563EB"),  # Royal Blue
+        "C": colors.HexColor("#059669"),  # Emerald Green
+        "D": colors.HexColor("#D97706"),  # Warm Amber
     }
-
-    total_items_count = 0
 
     for section in boq_sections:
         sec_id = section.get("section_id", "")
         sec_name = section.get("section_name", "").upper()
-        sec_color = section_badge_colors.get(sec_id, SECONDARY_NAVY)
+        accent_c = section_accent_colors.get(sec_id, COLOR_FLAME_RED)
         items = section.get("items", [])
-        total_items_count += len(items)
 
-        # Section Title Header
-        sec_title = Paragraph(
-            f"SECTION {sec_id}: {sec_name}",
-            ParagraphStyle(
-                "SecTitle", parent=styles["Heading2"],
-                fontName="Helvetica-Bold", fontSize=9.5, textColor=sec_color,
-                spaceBefore=6, spaceAfter=3, leading=12
-            )
+        # Full-width section header banner
+        sec_banner_table = Table(
+            [[Paragraph(f"SECTION {sec_id}: {sec_name}", section_heading)]],
+            colWidths=[18.6 * cm]
         )
+        sec_banner_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), COLOR_NAVY_HEADER),
+            ("LINELEFT", (0, 0), (0, -1), 5.0, accent_c),
+            ("PADDING", (0, 0), (-1, -1), 6.0),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ]))
 
-        table_data = [boq_header_row]
+        table_data = [table_header_row]
         for item in items:
-            sno_str = f"{int(item.get('sno', 0)):02d}" if str(item.get("sno", "")).isdigit() else str(item.get("sno", ""))
+            sno_val = item.get("sno", "")
+            sno_str = f"{int(sno_val):02d}" if str(sno_val).isdigit() else str(sno_val)
             table_data.append([
                 Paragraph(sno_str, tbl_sno_style),
                 Paragraph(item.get("item", ""), tbl_item_style),
                 Paragraph(item.get("description", ""), tbl_desc_style),
                 Paragraph(item.get("unit", ""), tbl_unit_style),
-                Paragraph(f"{item.get('quantity', 0):.1f}", tbl_qty_style),
+                Paragraph(f"{item.get('quantity', 0):,.1f}", tbl_qty_style),
                 Paragraph(item.get("calculation_basis", ""), tbl_basis_style),
             ])
 
         boq_table = Table(table_data, colWidths=col_widths, repeatRows=1)
         boq_table.setStyle(TableStyle([
-            # Table Header
-            ("BACKGROUND", (0, 0), (-1, 0), SECONDARY_NAVY),
-            ("PADDING", (0, 0), (-1, 0), 5.5),
+            # Header Row
+            ("BACKGROUND", (0, 0), (-1, 0), COLOR_NAVY_MAIN),
+            ("PADDING", (0, 0), (-1, 0), 5),
             ("VALIGN", (0, 0), (-1, 0), "MIDDLE"),
-            
             # Data Rows
-            ("GRID", (0, 0), (-1, -1), 0.4, BORDER_COLOR),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [WHITE, BG_CARD]),
-            ("PADDING", (0, 1), (-1, -1), 4.5),
+            ("GRID", (0, 0), (-1, -1), 0.4, COLOR_BORDER),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [WHITE, COLOR_BG_LIGHT]),
+            ("PADDING", (0, 1), (-1, -1), 5),
             ("VALIGN", (0, 1), (-1, -1), "TOP"),
         ]))
 
-        # Keep section title with table
-        story.append(KeepTogether([sec_title, boq_table]))
-        story.append(Spacer(1, 8))
+        # Keep title banner together with table
+        story.append(KeepTogether([sec_banner_table, Spacer(1, 2), boq_table]))
+        story.append(Spacer(1, 10))
 
-    # ── 5. SUMMARY STATS CARD ───────────────────────────────────────────────
-    story.append(Spacer(1, 4))
-    summary_box_data = [[
-        Paragraph(f"<b>TOTAL SECTIONS: {len(boq_sections)}</b>", card_label),
-        Paragraph(f"<b>TOTAL LINE ITEMS: {total_items_count} ITEMS</b>", card_val_bold),
-        Paragraph(f"<b>COMPLIANCE AUDIT: PASSED</b>", card_val_bold),
-    ]]
-    summary_box_table = Table(summary_box_data, colWidths=[6.2 * cm, 6.2 * cm, 6.2 * cm])
-    summary_box_table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), BG_HEADER),
-        ("GRID", (0, 0), (-1, -1), 0.5, BORDER_COLOR),
+    # ── 4. OFFICIAL ENGINEERING CERTIFICATE & SIGN-OFF ───────────────────────
+    disclaimer_p = Paragraph(
+        f"<b>ENGINEERING AUDIT STATEMENT & DISCLAIMER:</b> This Bill of Quantities (BOQ) takeoff was computed by spatial analysis algorithms compliant with {std_notes}. "
+        "All device quantities, pipe diameters, conduit runs, and equipment specifications are official engineering estimates. "
+        "Review, verification, and stamping by a Registered Chartered Fire Protection Engineer is required prior to commercial tender issuance.",
+        ParagraphStyle("AuditP", parent=styles["Normal"], fontName="Helvetica", fontSize=7.2, textColor=COLOR_TEXT_MUTED, leading=9.8)
+    )
+
+    stamp_box = [
+        Paragraph("<b>CHARTERED PE APPROVAL STAMP</b>", ParagraphStyle("StHead", parent=styles["Normal"], fontName="Helvetica-Bold", fontSize=7.5, textColor=COLOR_NAVY_MAIN, alignment=TA_CENTER)),
+        Spacer(1, 12),
+        Paragraph("_____________________________", ParagraphStyle("Line1", parent=styles["Normal"], fontName="Helvetica", fontSize=8, textColor=COLOR_TEXT_MUTED, alignment=TA_CENTER)),
+        Paragraph("Registered Fire Protection Engineer", ParagraphStyle("Line2", parent=styles["Normal"], fontName="Helvetica-Bold", fontSize=7, textColor=COLOR_TEXT_MUTED, alignment=TA_CENTER)),
+        Paragraph("PE License & Reg. No.", ParagraphStyle("Line3", parent=styles["Normal"], fontName="Helvetica-Oblique", fontSize=6.5, textColor=COLOR_TEXT_MUTED, alignment=TA_CENTER)),
+    ]
+    t_stamp = Table([[stamp_box]], colWidths=[5.4 * cm])
+    t_stamp.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), COLOR_BG_LIGHT),
+        ("BOX", (0, 0), (-1, -1), 0.8, COLOR_BORDER_GOLD),
         ("PADDING", (0, 0), (-1, -1), 6),
-        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
     ]))
-    story.append(summary_box_table)
-    story.append(Spacer(1, 8))
 
-    # ── 6. OFFICIAL ENGINEERING DISCLAIMER & SIGN-OFF ───────────────────────
-    note_box_data = [[
-        Paragraph(
-            f"<b>ENGINEERING VERIFICATION & DISCLAIMER:</b> This Bill of Quantities (BOQ) was automatically computed by spatial analysis algorithms compliant with {std_notes}. "
-            "All quantities, equipment ratings, and conduit runs are preliminary estimates and must be reviewed, verified, and stamped by a registered Fire Protection Engineer prior to commercial bidding or installation.",
-            ParagraphStyle("NoteBoxText", parent=styles["Normal"], fontName="Helvetica", fontSize=7, textColor=TEXT_MUTED, leading=9.5)
-        )
-    ]]
-    note_table = Table(note_box_data, colWidths=[18.6 * cm])
-    note_table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), BG_CARD),
-        ("BOX", (0, 0), (-1, -1), 0.8, PRIMARY_RED),
-        ("PADDING", (0, 0), (-1, -1), 7),
+    cert_table = Table([[disclaimer_p, t_stamp]], colWidths=[12.8 * cm, 5.8 * cm])
+    cert_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), COLOR_BG_LIGHT),
+        ("BOX", (0, 0), (-1, -1), 0.8, COLOR_NAVY_HEADER),
+        ("PADDING", (0, 0), (-1, -1), 8),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
     ]))
-    story.append(note_table)
+    story.append(KeepTogether([cert_table]))
 
-    # Build document using NumberedCanvas
+    # Build PDF using NumberedCanvas
     doc.build(story, canvasmaker=NumberedCanvas)
     buffer.seek(0)
     return buffer.read()
+
 
 
 def generate_excel(project: dict, building_data: dict, recommendations: dict, boq_sections: list, standard: str = "NBC") -> bytes:
@@ -449,35 +453,57 @@ def generate_excel(project: dict, building_data: dict, recommendations: dict, bo
 
     row += 2
 
-    # ── BOQ SECTIONS ─────────────────────────────────────────────────────────────
-    section_colors = {"A": "E74C3C", "B": "2980B9", "C": "27AE60"}
+    # ── SUMMARY CARDS ─────────────────────────────────────────────────────────────
+    summary_headers = ["Total Area (sqm)", "Floors", "Rooms", "Corridors", "Staircases", "Exits"]
+    summary_values  = [
+        building_data.get("estimated_area", 0),
+        building_data.get("floors", 1),
+        building_data.get("rooms", 0),
+        building_data.get("corridors", 0),
+        building_data.get("stairs", 0),
+        building_data.get("exits", 0),
+    ]
+
+    for col_idx, (h, v) in enumerate(zip(summary_headers, summary_values), start=1):
+        col_letter = get_column_letter(col_idx)
+        c_h = ws[f"{col_letter}{row}"]
+        c_h.value = h
+        header_style(c_h, "#34495E", size=8)
+
+        c_v = ws[f"{col_letter}{row+1}"]
+        c_v.value = v
+        data_style(c_v, bold=True, align="center", size=10)
+        c_v.border = thin
+
+    row += 3
+
+    # ── SECTIONS ──────────────────────────────────────────────────────────────────
+    headers = ["S.No", "Item Name", "Technical Description", "Unit", "Quantity", "Calculation Basis"]
 
     for section in boq_sections:
-        sec_id = section.get("section_id", "")
-        sec_color = section_colors.get(sec_id, "2C3E50")
+        sec_id   = section.get("section_id", "")
+        sec_name = section.get("section_name", "")
+        items    = section.get("items", [])
 
-        # Section header
+        # Section Header
         ws.merge_cells(f"A{row}:F{row}")
         cell = ws[f"A{row}"]
-        cell.value = f"SECTION {sec_id}: {section.get('section_name', '').upper()}"
-        header_style(cell, f"#{sec_color}", size=11)
+        cell.value = f"SECTION {sec_id}: {sec_name.upper()}"
+        header_style(cell, "#16A085", size=10)
         ws.row_dimensions[row].height = 22
         row += 1
 
-        # Column headers
-        headers = ["S.No", "Item", "Description", "Unit", "Quantity", "Calculation Basis"]
-        for col, h in enumerate(headers, 1):
-            cell = ws.cell(row=row, column=col, value=h)
-            header_style(cell, "#34495E", size=9)
-            cell.border = thin
-        ws.row_dimensions[row].height = 16
+        # Table Column Headers
+        for col_idx, h in enumerate(headers, start=1):
+            c = ws[f"{get_column_letter(col_idx)}{row}"]
+            c.value = h
+            header_style(c, "#2C3E50", size=9)
+        ws.row_dimensions[row].height = 20
         row += 1
 
-        # Items
-        alt_colors = ["FFFFFF", "F8F9FA"]
-        for i, item in enumerate(section.get("items", [])):
-            bg = alt_colors[i % 2]
-            row_data = [
+        # Data Rows
+        for item in items:
+            row_vals = [
                 item.get("sno", ""),
                 item.get("item", ""),
                 item.get("description", ""),
@@ -485,28 +511,28 @@ def generate_excel(project: dict, building_data: dict, recommendations: dict, bo
                 item.get("quantity", 0),
                 item.get("calculation_basis", ""),
             ]
-            for col, val in enumerate(row_data, 1):
-                cell = ws.cell(row=row, column=col, value=val)
-                cell.fill = PatternFill("solid", fgColor=bg)
-                bold = col == 2  # item name bold
-                align = "right" if col == 5 else ("center" if col in [1, 4] else "left")
-                data_style(cell, bold=bold, align=align)
-                cell.border = thin
-            ws.row_dimensions[row].height = 40
+            aligns = ["center", "left", "left", "center", "right", "left"]
+            for col_idx, (v, align) in enumerate(zip(row_vals, aligns), start=1):
+                c = ws[f"{get_column_letter(col_idx)}{row}"]
+                c.value = v
+                data_style(c, align=align)
+                c.border = thin
+                if align == "right" and isinstance(v, (int, float)):
+                    c.number_format = "#,##0.0"
+            ws.row_dimensions[row].height = 28
             row += 1
 
-        row += 1  # Gap between sections
+        row += 1  # Blank row between sections
 
-    # ── NOTES ─────────────────────────────────────────────────────────────────────
+    # ── FOOTER / DISCLAIMER ───────────────────────────────────────────────────────
     ws.merge_cells(f"A{row}:F{row}")
     cell = ws[f"A{row}"]
     cell.value = (
-        f"NOTE: BOQ generated by AI analysis. Quantities subject to site verification. "
-        f"Standards: {std_notes}."
+        f"DISCLAIMER: This BOQ is automatically generated based on spatial analysis and complies with {std_notes}. "
+        "All quantities are preliminary estimates and must be verified by a certified engineer before commercial use."
     )
     cell.font = Font(italic=True, size=8, color="7F8C8D")
-    cell.alignment = Alignment(wrap_text=True)
-    ws.row_dimensions[row].height = 30
+    cell.alignment = Alignment(horizontal="center", wrap_text=True)
 
     buffer = io.BytesIO()
     wb.save(buffer)
@@ -515,18 +541,22 @@ def generate_excel(project: dict, building_data: dict, recommendations: dict, bo
 
 
 def generate_csv(boq_sections: list) -> str:
-    """Generate CSV from BOQ sections."""
-    import csv
-    import io as _io
-
-    output = _io.StringIO()
+    """Generate CSV string from BOQ sections."""
+    output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["Section", "S.No", "Item", "Description", "Unit", "Quantity", "Calculation Basis"])
-
+    
+    # Header
+    writer.writerow([
+        "Section ID", "Section Name", "S.No", "Item Name",
+        "Technical Description", "Unit", "Quantity", "Calculation Basis"
+    ])
+    
     for section in boq_sections:
+        sec_id = section.get("section_id", "")
         sec_name = section.get("section_name", "")
         for item in section.get("items", []):
             writer.writerow([
+                sec_id,
                 sec_name,
                 item.get("sno", ""),
                 item.get("item", ""),
@@ -535,5 +565,5 @@ def generate_csv(boq_sections: list) -> str:
                 item.get("quantity", 0),
                 item.get("calculation_basis", ""),
             ])
-
+            
     return output.getvalue()

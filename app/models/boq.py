@@ -24,6 +24,12 @@ class BOQGenerateRequest(BaseModel):
     ai_model: Optional[str] = None    # if None, uses the project's saved ai_model
 
 
+class BOQUpdateRequest(BaseModel):
+    sections: List[BOQSection]
+    notes: Optional[str] = None
+
+
+
 class BOQReport(BaseModel):
     id: str
     project_id: str
